@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Sales Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        #dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 20px;
+            margin-top: 20px;
+        }
+        .chart-container {
+            width: 100%;
+            height: 400px;
+        }
+        input {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>📊 Interactive Sales Performance Dashboard</h2>
+    <input type="file" id="fileInput" accept=".json">
+    <button onclick="processFile()">Upload & Generate Dashboard</button>
+
+    <div id="dashboard">
+        <div class="chart-container" id="sales_over_time"></div>
+        <div class="chart-container" id="sales_by_product"></div>
+        <div class="chart-container" id="top_customers"></div>
+        <div class="chart-container" id="sales_by_region"></div>
+        <div class="chart-container" id="order_status"></div>
+    </div>
+
+    <script>
+        let salesData = [];
+
+        function processFile() {
+            const fileInput = document.getElementById("fileInput").files[0];
+            if (!fileInput) {
+                alert("Please select a JSON file!");
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                salesData = JSON.parse(event.target.result);
+                generateDashboard();
+            };
+            reader.readAsText(fileInput);
+        }
+
+        function generateDashboard() {
+            if (salesData.length === 0) {
+                alert("No sales data available!");
+                return;
+            }
+
+            // 1️⃣ Sales Revenue Over Time
+            let salesByDate = {};
+            salesData.forEach(order => {
+                let date = order.ORDERDATE.split(" ")[0];
+                salesByDate[date] = (salesByDate[date] || 0) + order.SALES;
+            });
+
+            let dates = Object.keys(salesByDate).sort();
+            let sales = dates.map(date => salesByDate[date]);
+
+            Plotly.newPlot("sales_over_time", [{
+                x: dates,
+                y: sales,
+                mode: "lines+markers",
+                type: "scatter",
+                marker: { color: "blue" }
+            }], { title: "Sales Revenue Over Time", xaxis: { title: "Date" }, yaxis: { title: "Revenue ($)" } });
+
+            // 2️⃣ Sales by Product Line
+            let productSales = {};
+            salesData.forEach(order => {
+                productSales[order.PRODUCTLINE] = (productSales[order.PRODUCTLINE] || 0) + order.SALES;
+            });
+
+            Plotly.newPlot("sales_by_product", [{
+                x: Object.keys(productSales),
+                y: Object.values(productSales),
+                type: "bar",
+                marker: { color: "green" }
+            }], { title: "Sales by Product Line", xaxis: { title: "Product Line" }, yaxis: { title: "Revenue ($)" } });
+
+            // 3️⃣ Top Customers by Revenue
+            let customerSales = {};
+            salesData.forEach(order => {
+                customerSales[order.CUSTOMERNAME] = (customerSales[order.CUSTOMERNAME] || 0) + order.SALES;
+            });
+
+            let sortedCustomers = Object.entries(customerSales).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            let customerNames = sortedCustomers.map(c => c[0]);
+            let customerValues = sortedCustomers.map(c => c[1]);
+
+            Plotly.newPlot("top_customers", [{
+                x: customerValues,
+                y: customerNames,
+                type: "bar",
+                orientation: "h",
+                marker: { color: "orange" }
+            }], { title: "Top Customers by Revenue", xaxis: { title: "Revenue ($)" }, yaxis: { title: "Customer" } });
+
+            // 4️⃣ Sales by Region (Geographical Heatmap)
+            let countrySales = {};
+            salesData.forEach(order => {
+                countrySales[order.COUNTRY] = (countrySales[order.COUNTRY] || 0) + order.SALES;
+            });
+
+            Plotly.newPlot("sales_by_region", [{
+                type: "choropleth",
+                locations: Object.keys(countrySales),
+                z: Object.values(countrySales),
+                locationmode: "country names",
+                colorscale: "Viridis"
+            }], { title: "Sales by Country" });
+
+            // 5️⃣ Order Status Breakdown
+            let orderStatusCount = {};
+            salesData.forEach(order => {
+                orderStatusCount[order.STATUS] = (orderStatusCount[order.STATUS] || 0) + 1;
+            });
+
+            Plotly.newPlot("order_status", [{
+                labels: Object.keys(orderStatusCount),
+                values: Object.values(orderStatusCount),
+                type: "pie"
+            }], { title: "Order Status Breakdown" });
+        }
+    </script>
+
+</body>
+</html>
